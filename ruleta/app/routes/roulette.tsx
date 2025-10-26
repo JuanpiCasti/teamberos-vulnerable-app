@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import type { Route } from "./+types/roulette";
 import { useBalance } from "~/contexts/BalanceContext";
+import { useAuth } from "~/contexts/AuthContext";
 import { RouletteWheel } from "~/components/RouletteWheel";
 import { BettingBoard } from "~/components/BettingBoard";
 import { ROULETTE_WHEEL, type Bet } from "~/constants/roulette";
@@ -13,12 +15,24 @@ export const meta: Route.MetaFunction = () => {
 };
 
 export default function Roulette() {
-  const { balance, addBalance, subtractBalance } = useBalance();
+  const { balance, addBalance, subtractBalance, fetchBalance } = useBalance();
+  const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
   const [bets, setBets] = useState<Bet[]>([]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [winningNumber, setWinningNumber] = useState<string | null>(null);
   const [winningIndex, setWinningIndex] = useState<number | null>(null);
   const [message, setMessage] = useState<string>("");
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate("/login");
+    } else {
+      // Fetch balance from backend on mount
+      fetchBalance();
+    }
+  }, [isAuthenticated, navigate, fetchBalance]);
 
   const totalBet = bets.reduce((sum, bet) => sum + bet.amount, 0);
 
@@ -102,12 +116,21 @@ export default function Roulette() {
       <div className="container mx-auto max-w-7xl">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold">American Roulette</h1>
+          <div>
+            <h1 className="text-4xl font-bold">American Roulette</h1>
+            <p className="text-gray-400 mt-1">Playing as {user?.username}</p>
+          </div>
           <div className="flex items-center gap-4">
             <div className="bg-black/50 px-6 py-3 rounded-lg border border-yellow-500">
               <span className="text-yellow-500 font-semibold">Balance: </span>
               <span className="text-2xl font-bold">${balance}</span>
             </div>
+            <button
+              onClick={logout}
+              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition font-semibold"
+            >
+              Logout
+            </button>
             <a
               href="/"
               className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition"

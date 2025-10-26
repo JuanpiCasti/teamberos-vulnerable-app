@@ -1,5 +1,8 @@
+import { useEffect } from "react";
+import { useNavigate } from "react-router";
 import type { Route } from "./+types/home";
 import { useBalance } from "~/contexts/BalanceContext";
+import { useAuth } from "~/contexts/AuthContext";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -9,7 +12,19 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function Home() {
-  const { balance } = useBalance();
+  const { balance, fetchBalance } = useBalance();
+  const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate("/login");
+    } else {
+      // Fetch balance from backend on mount
+      fetchBalance();
+    }
+  }, [isAuthenticated, navigate, fetchBalance]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white">
@@ -22,11 +37,23 @@ export default function Home() {
           <p className="text-xl text-gray-300">Try your luck and win big!</p>
         </div>
 
-        {/* Balance Display */}
-        <div className="max-w-md mx-auto mb-12 bg-black/50 p-6 rounded-xl border-2 border-yellow-500">
+        {/* User Info and Balance Display */}
+        <div className="max-w-md mx-auto mb-12">
+          <div className="bg-black/50 p-6 rounded-xl border-2 border-yellow-500 mb-4">
+            <div className="text-center">
+              <p className="text-gray-400 mb-2">Welcome, {user?.username}!</p>
+              <p className="text-gray-500 text-sm mb-4">{user?.email}</p>
+              <p className="text-gray-400 mb-2">Your Balance</p>
+              <p className="text-5xl font-bold text-yellow-500">${balance}</p>
+            </div>
+          </div>
           <div className="text-center">
-            <p className="text-gray-400 mb-2">Your Balance</p>
-            <p className="text-5xl font-bold text-yellow-500">${balance}</p>
+            <button
+              onClick={logout}
+              className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-semibold transition"
+            >
+              Logout
+            </button>
           </div>
         </div>
 

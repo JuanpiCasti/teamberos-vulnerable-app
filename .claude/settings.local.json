@@ -3,7 +3,8 @@
     "allow": [
       "Bash(dir:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(npm run typecheck:*)"
     ],
     "deny": [],
     "ask": []
