@@ -1,0 +1,346 @@
+{
+	"info": {
+		"_postman_id": "casino-backend-api",
+		"name": "Casino Backend API",
+		"description": "Colección de Postman para probar todos los endpoints del Casino Backend API.\n\n⚠️ ADVERTENCIA: Este API contiene vulnerabilidades intencionales con fines educativos.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{jwt_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health",
+					"host": ["{{base_url}}"],
+					"path": ["health"]
+				},
+				"description": "Verifica que el servidor esté funcionando"
+			}
+		},
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set(\"user_id\", jsonData.user.id);",
+									"    console.log(\"User registered with ID: \" + jsonData.user.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"player1\",\n    \"email\": \"player1@example.com\",\n    \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "register"]
+						},
+						"description": "Registra un nuevo usuario con balance inicial de $1000"
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set(\"jwt_token\", jsonData.token);",
+									"    pm.environment.set(\"user_id\", jsonData.user.id);",
+									"    console.log(\"JWT Token saved: \" + jsonData.token.substring(0, 20) + \"...\");",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"player1@example.com\",\n    \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "login"]
+						},
+						"description": "Inicia sesión y obtiene JWT token (se guarda automáticamente en variable de entorno)"
+					}
+				}
+			]
+		},
+		{
+			"name": "User Profile",
+			"item": [
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/user/profile",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile"]
+						},
+						"description": "Obtiene el perfil del usuario autenticado"
+					}
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"player1_updated\",\n    \"email\": \"player1_new@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/profile",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile"]
+						},
+						"description": "Actualiza username y/o email del usuario"
+					}
+				}
+			]
+		},
+		{
+			"name": "Balance Management",
+			"item": [
+				{
+					"name": "Get Balance",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/balance",
+							"host": ["{{base_url}}"],
+							"path": ["api", "balance"]
+						},
+						"description": "Consulta el balance actual del usuario"
+					}
+				},
+				{
+					"name": "Add Balance",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bet_id\": 1,\n    \"amount\": 1000\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/balance/add",
+							"host": ["{{base_url}}"],
+							"path": ["api", "balance", "add"]
+						},
+						"description": "Acredita balance (usado para premios ganados). Requiere ID de apuesta ganadora."
+					}
+				},
+				{
+					"name": "Deduct Balance",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 50\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/balance/deduct",
+							"host": ["{{base_url}}"],
+							"path": ["api", "balance", "deduct"]
+						},
+						"description": "Debita balance (usado manualmente, las apuestas lo hacen automáticamente)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Bets",
+			"item": [
+				{
+					"name": "Place Bet - Number",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set(\"last_bet_id\", jsonData.bet_id);",
+									"    console.log(\"Bet placed with ID: \" + jsonData.bet_id);",
+									"    console.log(\"Result: \" + jsonData.result);",
+									"    console.log(\"Winning number: \" + jsonData.winning_number + \" (\" + jsonData.winning_color + \")\");",
+									"    if (jsonData.result === \"win\") {",
+									"        console.log(\"WON! Payout: $\" + jsonData.payout);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bet_type\": \"number\",\n    \"bet_value\": \"17\",\n    \"bet_amount\": 50\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/bets",
+							"host": ["{{base_url}}"],
+							"path": ["api", "bets"]
+						},
+						"description": "Realiza una apuesta a un número específico (pago 36x)"
+					}
+				},
+				{
+					"name": "Place Bet - Color",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set(\"last_bet_id\", jsonData.bet_id);",
+									"    console.log(\"Bet placed with ID: \" + jsonData.bet_id);",
+									"    console.log(\"Result: \" + jsonData.result);",
+									"    console.log(\"Winning number: \" + jsonData.winning_number + \" (\" + jsonData.winning_color + \")\");",
+									"    if (jsonData.result === \"win\") {",
+									"        console.log(\"WON! Payout: $\" + jsonData.payout);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bet_type\": \"color\",\n    \"bet_value\": \"red\",\n    \"bet_amount\": 100\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/bets",
+							"host": ["{{base_url}}"],
+							"path": ["api", "bets"]
+						},
+						"description": "Realiza una apuesta a un color (red/black/green, pago 2x)"
+					}
+				},
+				{
+					"name": "Get Bet History",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/bets",
+							"host": ["{{base_url}}"],
+							"path": ["api", "bets"]
+						},
+						"description": "Obtiene el historial completo de apuestas del usuario"
+					}
+				},
+				{
+					"name": "Get Bet by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/bets/{{last_bet_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "bets", "{{last_bet_id}}"]
+						},
+						"description": "Obtiene el detalle de una apuesta específica"
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	]
+}

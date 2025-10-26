@@ -1,0 +1,83 @@
+====================================================================
+  CÓMO EJECUTAR EL CASINO BACKEND
+====================================================================
+
+MÉTODO MÁS FÁCIL (Windows):
+----------------------------
+1. Doble clic en: start-server.bat
+2. El script te dirá si falta algo (Go o GCC)
+3. Si todo está OK, el servidor iniciará automáticamente
+
+MÉTODO MÁS FÁCIL (Linux/Mac):
+------------------------------
+1. Abre terminal en esta carpeta
+2. Ejecuta: ./start-server.sh
+3. El script te dirá si falta algo (Go o GCC)
+4. Si todo está OK, el servidor iniciará automáticamente
+
+MÉTODO MANUAL:
+--------------
+Windows (PowerShell):
+  $env:CGO_ENABLED=1
+  go run cmd/api/main.go
+
+Windows (CMD):
+  set CGO_ENABLED=1
+  go run cmd/api/main.go
+
+Linux/Mac:
+  CGO_ENABLED=1 go run cmd/api/main.go
+
+REQUISITOS:
+-----------
+1. Go 1.23+ instalado
+   - Descargar: https://go.dev/dl/
+
+2. GCC instalado (para SQLite)
+   Windows: MinGW-w64
+   - Descargar: https://github.com/niXman/mingw-builds-binaries/releases
+   - Buscar: x86_64-13.2.0-release-posix-seh-ucrt-rt_v11-rev1.7z
+   - Extraer en C:\mingw64
+   - Agregar C:\mingw64\bin al PATH
+
+   Linux: sudo apt-get install build-essential
+   Mac: xcode-select --install
+
+VERIFICAR QUE FUNCIONA:
+-----------------------
+Abre navegador en: http://localhost:8080/health
+Deberías ver: {"status":"ok"}
+
+PROBAR LA API:
+--------------
+1. Abre Postman
+2. Import → File → docs/postman_collection.json
+3. Ejecuta las requests en orden:
+   - Register User
+   - Login (el token se guarda automáticamente)
+   - Get Balance
+   - Place Bet
+   - etc.
+
+ARCHIVOS DE AYUDA:
+------------------
+- README.md         → Documentación completa
+- QUICKSTART.md     → Guía paso a paso detallada
+- docs/swagger.yaml → Documentación de la API
+- docs/postman_collection.json → Colección de Postman
+
+SOLUCIÓN DE PROBLEMAS:
+----------------------
+Error: "CGO_ENABLED=0"
+  → Instala GCC y ejecuta con CGO_ENABLED=1
+
+Error: "gcc: command not found"
+  → GCC no está en el PATH, reinicia la terminal
+
+Puerto 8080 ocupado:
+  → Cambia el puerto: set PORT=8081 && go run cmd/api/main.go
+
+====================================================================
+⚠️  ADVERTENCIA: Proyecto educativo con vulnerabilidades
+    NO expongas este servidor a internet
+====================================================================
