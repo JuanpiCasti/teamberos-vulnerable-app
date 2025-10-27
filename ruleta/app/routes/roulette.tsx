@@ -6,6 +6,7 @@ import { useAuth } from "~/contexts/AuthContext";
 import { RouletteWheel } from "~/components/RouletteWheel";
 import { BettingBoard } from "~/components/BettingBoard";
 import { ROULETTE_WHEEL, type Bet } from "~/constants/roulette";
+import { authenticatedFetch } from "~/config/api";
 
 export const meta: Route.MetaFunction = () => {
   return [
@@ -15,7 +16,7 @@ export const meta: Route.MetaFunction = () => {
 };
 
 export default function Roulette() {
-  const { balance, addBalance, subtractBalance, fetchBalance } = useBalance();
+  const { balance, addBalance, subtractBalance, fetchBalance, deductBalance, addBalanceWithBet, setBalance } = useBalance();
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
   const [bets, setBets] = useState<Bet[]>([]);
@@ -23,6 +24,7 @@ export default function Roulette() {
   const [winningNumber, setWinningNumber] = useState<string | null>(null);
   const [winningIndex, setWinningIndex] = useState<number | null>(null);
   const [message, setMessage] = useState<string>("");
+  const [lastBetId, setLastBetId] = useState<number | null>(null);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -33,6 +35,16 @@ export default function Roulette() {
       fetchBalance();
     }
   }, [isAuthenticated, navigate, fetchBalance]);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  // Don't render anything if not authenticated (redirect in progress)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const totalBet = bets.reduce((sum, bet) => sum + bet.amount, 0);
 
@@ -58,57 +70,97 @@ export default function Roulette() {
     setMessage("");
   };
 
-  const spin = () => {
+  const spin = async () => {
     if (totalBet === 0) {
       setMessage("Place a bet first!");
       return;
     }
 
-    if (!subtractBalance(totalBet)) {
-      setMessage("Insufficient balance!");
-      return;
-    }
-
     setIsSpinning(true);
-    setMessage("");
+    setMessage("Processing bet...");
 
-    // Simulate spinning animation delay
-    setTimeout(() => {
-      const randomIndex = Math.floor(Math.random() * ROULETTE_WHEEL.length);
-      const winner = ROULETTE_WHEEL[randomIndex];
-      setWinningNumber(winner.number);
-      setWinningIndex(randomIndex);
-
-      // Check for wins - both number and color bets
-      let totalWinnings = 0;
-      const winningBets: string[] = [];
-
-      bets.forEach((bet) => {
-        if (bet.type === "number" && bet.value === winner.number) {
-          // Direct number bet: 35:1 payout + original bet = 36x
-          const payout = bet.amount * 36;
-          totalWinnings += payout;
-          winningBets.push(`${bet.value} (number)`);
-        } else if (bet.type === "color" && bet.value === winner.color) {
-          // Color bet: 1:1 payout + original bet = 2x
-          const payout = bet.amount * 2;
-          totalWinnings += payout;
-          winningBets.push(`${bet.value} (color)`);
-        }
-      });
-
-      if (totalWinnings > 0) {
-        addBalance(totalWinnings);
-        setMessage(
-          `Winner! ${winner.number} ${winner.color}! You won $${totalWinnings}! (${winningBets.join(", ")})`
-        );
-      } else {
-        setMessage(`${winner.number} ${winner.color}. Better luck next time!`);
+    try {
+      // Step 1: Deduct balance via backend
+      const deductResult = await deductBalance(totalBet);
+      if (!deductResult.success) {
+        setMessage(deductResult.message || "Failed to deduct balance!");
+        setIsSpinning(false);
+        return;
       }
 
+      // Step 2: Record bet via backend (just records, doesn't process)
+      const primaryBet = bets[0];
+      const betResponse = await authenticatedFetch("/api/bets", {
+        method: "POST",
+        body: JSON.stringify({
+          bet_type: primaryBet.type,
+          bet_value: primaryBet.value,
+          bet_amount: totalBet,
+        }),
+      });
+
+      if (!betResponse.ok) {
+        setMessage("Failed to record bet. Please try again.");
+        setIsSpinning(false);
+        return;
+      }
+
+      const betData = await betResponse.json();
+      const betId = betData.bet_id;
+      setLastBetId(betId);
+
+      setMessage("Spinning...");
+
+      // Step 3: Frontend determines winner (VULNERABLE DESIGN)
+      setTimeout(async () => {
+        const randomIndex = Math.floor(Math.random() * ROULETTE_WHEEL.length);
+        const winner = ROULETTE_WHEEL[randomIndex];
+        setWinningNumber(winner.number);
+        setWinningIndex(randomIndex);
+
+        // Step 4: Calculate winnings based on FRONTEND determination
+        let totalWinnings = 0;
+        const winningBets: string[] = [];
+
+        bets.forEach((bet) => {
+          if (bet.type === "number" && bet.value === winner.number) {
+            // Direct number bet: 35:1 payout + original bet = 36x
+            const payout = bet.amount * 36;
+            totalWinnings += payout;
+            winningBets.push(`${bet.value} (number)`);
+          } else if (bet.type === "color" && bet.value === winner.color) {
+            // Color bet: 1:1 payout + original bet = 2x
+            const payout = bet.amount * 2;
+            totalWinnings += payout;
+            winningBets.push(`${bet.value} (color)`);
+          }
+        });
+
+        // Step 5: If frontend determines win, credit via backend
+        // VULNERABLE: Frontend decides if user won and amount
+        if (totalWinnings > 0) {
+          const addResult = await addBalanceWithBet(betId, totalWinnings);
+          if (addResult.success) {
+            setMessage(
+              `Winner! ${winner.number} ${winner.color}! You won $${totalWinnings}! (${winningBets.join(", ")})`
+            );
+          } else {
+            setMessage(
+              `Winner! ${winner.number} ${winner.color}! But failed to credit winnings: ${addResult.message}`
+            );
+          }
+        } else {
+          setMessage(`${winner.number} ${winner.color}. Better luck next time!`);
+        }
+
+        setIsSpinning(false);
+        setBets([]);
+      }, 3000);
+    } catch (error) {
+      console.error("Error placing bet:", error);
+      setMessage("Network error. Please try again.");
       setIsSpinning(false);
-      setBets([]);
-    }, 3000);
+    }
   };
 
   return (
@@ -126,7 +178,7 @@ export default function Roulette() {
               <span className="text-2xl font-bold">${balance}</span>
             </div>
             <button
-              onClick={logout}
+              onClick={handleLogout}
               className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition font-semibold"
             >
               Logout

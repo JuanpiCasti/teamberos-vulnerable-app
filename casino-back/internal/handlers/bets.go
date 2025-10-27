@@ -3,10 +3,8 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"math/rand"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/juanpicasti/casino-back/internal/database"
@@ -31,7 +29,8 @@ var rouletteWheel = []struct {
 	{"14", "red"}, {"2", "black"},
 }
 
-// CreateBet handles placing a new bet and immediately processes it
+// CreateBet handles placing a new bet (SIMPLIFIED - just records, doesn't process)
+// VULNERABLE: No balance check, no processing, frontend controls everything
 func CreateBet(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user ID from context
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
@@ -47,71 +46,12 @@ func CreateBet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate bet
-	if req.BetType != "number" && req.BetType != "color" {
-		http.Error(w, "Invalid bet type. Must be 'number' or 'color'", http.StatusBadRequest)
-		return
-	}
-
-	if req.BetAmount <= 0 {
-		http.Error(w, "Bet amount must be positive", http.StatusBadRequest)
-		return
-	}
-
-	// Check if user has sufficient balance
-	var currentBalance float64
-	err := database.DB.Get(&currentBalance, `SELECT amount FROM balances WHERE user_id = ?`, userID)
-	if err != nil {
-		http.Error(w, "Failed to fetch balance", http.StatusInternalServerError)
-		return
-	}
-
-	if currentBalance < req.BetAmount {
-		http.Error(w, "Insufficient balance", http.StatusBadRequest)
-		return
-	}
-
-	// Spin the roulette (random outcome)
-	rand.Seed(time.Now().UnixNano())
-	resultIndex := rand.Intn(len(rouletteWheel))
-	winningNumber := rouletteWheel[resultIndex].Number
-	winningColor := rouletteWheel[resultIndex].Color
-
-	// Determine if bet won
-	result := "loss"
-	payout := 0.0
-
-	if req.BetType == "number" && req.BetValue == winningNumber {
-		result = "win"
-		payout = req.BetAmount * 36 // 35:1 payout + original bet
-	} else if req.BetType == "color" && req.BetValue == winningColor {
-		result = "win"
-		payout = req.BetAmount * 2 // 1:1 payout + original bet
-	}
-
-	// Start transaction
-	tx, err := database.DB.Beginx()
-	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback()
-
-	// Deduct bet amount from balance
-	_, err = tx.Exec(
-		`UPDATE balances SET amount = amount - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?`,
-		req.BetAmount, userID,
-	)
-	if err != nil {
-		http.Error(w, "Failed to deduct balance", http.StatusInternalServerError)
-		return
-	}
-
-	// Record the bet
-	res, err := tx.Exec(
-		`INSERT INTO bets (user_id, bet_type, bet_value, bet_amount, winning_number, winning_color, result, payout)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		userID, req.BetType, req.BetValue, req.BetAmount, winningNumber, winningColor, result, payout,
+	// VULNERABLE: Just record the bet, no validation, no processing
+	// No balance check, no deduction, no spinning, no crediting
+	// Frontend handles all game logic
+	res, err := database.DB.Exec(
+		`INSERT INTO bets (user_id, bet_type, bet_value, bet_amount, result, payout) VALUES (?, ?, ?, ?, 'pending', 0.0)`,
+		userID, req.BetType, req.BetValue, req.BetAmount,
 	)
 	if err != nil {
 		http.Error(w, "Failed to record bet", http.StatusInternalServerError)
@@ -124,44 +64,11 @@ func CreateBet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If won, add payout to balance
-	if result == "win" {
-		_, err = tx.Exec(
-			`UPDATE balances SET amount = amount + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?`,
-			payout, userID,
-		)
-		if err != nil {
-			http.Error(w, "Failed to add payout", http.StatusInternalServerError)
-			return
-		}
-	}
-
-	// Commit transaction
-	if err := tx.Commit(); err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
-	}
-
-	// Fetch new balance
-	var newBalance float64
-	err = database.DB.Get(&newBalance, `SELECT amount FROM balances WHERE user_id = ?`, userID)
-	if err != nil {
-		http.Error(w, "Failed to fetch balance", http.StatusInternalServerError)
-		return
-	}
-
-	// Return result
-	betResult := models.BetResult{
-		BetID:         int(betID),
-		Result:        result,
-		WinningNumber: winningNumber,
-		WinningColor:  winningColor,
-		Payout:        payout,
-		NewBalance:    newBalance,
-	}
-
+	// Just return bet_id, nothing else
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(betResult)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"bet_id": int(betID),
+	})
 }
 
 // GetBets returns the authenticated user's bet history

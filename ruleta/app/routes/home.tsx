@@ -16,15 +16,17 @@ export default function Home() {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect to login if not authenticated
+  // Fetch balance from backend on mount if authenticated
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate("/login");
-    } else {
-      // Fetch balance from backend on mount
+    if (isAuthenticated) {
       fetchBalance();
     }
-  }, [isAuthenticated, navigate, fetchBalance]);
+  }, [isAuthenticated, fetchBalance]);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white">
@@ -37,24 +39,53 @@ export default function Home() {
           <p className="text-xl text-gray-300">Try your luck and win big!</p>
         </div>
 
-        {/* User Info and Balance Display */}
+        {/* User Info and Balance Display OR Login CTA */}
         <div className="max-w-md mx-auto mb-12">
-          <div className="bg-black/50 p-6 rounded-xl border-2 border-yellow-500 mb-4">
-            <div className="text-center">
-              <p className="text-gray-400 mb-2">Welcome, {user?.username}!</p>
-              <p className="text-gray-500 text-sm mb-4">{user?.email}</p>
-              <p className="text-gray-400 mb-2">Your Balance</p>
-              <p className="text-5xl font-bold text-yellow-500">${balance}</p>
+          {isAuthenticated ? (
+            <>
+              <div className="bg-black/50 p-6 rounded-xl border-2 border-yellow-500 mb-4">
+                <div className="text-center">
+                  <p className="text-gray-400 mb-2">Welcome, {user?.username}!</p>
+                  <p className="text-gray-500 text-sm mb-4">{user?.email}</p>
+                  <p className="text-gray-400 mb-2">Your Balance</p>
+                  <p className="text-5xl font-bold text-yellow-500">${balance}</p>
+                </div>
+              </div>
+              <div className="text-center">
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-semibold transition"
+                >
+                  Logout
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="bg-black/50 p-8 rounded-xl border-2 border-yellow-500">
+              <div className="text-center">
+                <h3 className="text-2xl font-bold mb-4 text-yellow-500">
+                  Ready to Play?
+                </h3>
+                <p className="text-gray-300 mb-6">
+                  Login or create an account to start playing and win big!
+                </p>
+                <div className="flex gap-4 justify-center">
+                  <a
+                    href="/login"
+                    className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-bold py-3 px-8 rounded-lg transition"
+                  >
+                    Login
+                  </a>
+                  <a
+                    href="/register"
+                    className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-black font-bold py-3 px-8 rounded-lg transition"
+                  >
+                    Register
+                  </a>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="text-center">
-            <button
-              onClick={logout}
-              className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-semibold transition"
-            >
-              Logout
-            </button>
-          </div>
+          )}
         </div>
 
         {/* Games Grid */}

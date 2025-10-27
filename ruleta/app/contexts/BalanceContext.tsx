@@ -8,6 +8,8 @@ interface BalanceContextType {
   subtractBalance: (amount: number) => boolean;
   setBalance: (amount: number) => void;
   fetchBalance: () => Promise<void>;
+  deductBalance: (amount: number) => Promise<{ success: boolean; message?: string }>;
+  addBalanceWithBet: (betId: number, amount: number) => Promise<{ success: boolean; message?: string }>;
 }
 
 const BalanceContext = createContext<BalanceContextType | undefined>(undefined);
@@ -39,9 +41,57 @@ export function BalanceProvider({ children }: { children: React.ReactNode }) {
     return false;
   };
 
+  const deductBalance = async (amount: number): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const response = await authenticatedFetch("/api/balance/deduct", {
+        method: "POST",
+        body: JSON.stringify({ amount }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Update local balance from backend response
+        if (data.balance && data.balance.amount !== undefined) {
+          setBalance(data.balance.amount);
+        }
+        return { success: true, message: data.message };
+      } else {
+        return { success: false, message: data.message || "Failed to deduct balance" };
+      }
+    } catch (error) {
+      console.error("Failed to deduct balance:", error);
+      return { success: false, message: "Network error. Please try again." };
+    }
+  };
+
+  const addBalanceWithBet = async (betId: number, amount: number): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const response = await authenticatedFetch("/api/balance/add", {
+        method: "POST",
+        body: JSON.stringify({ amount }), // Backend no longer requires bet_id
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Update local balance from backend response
+        if (data.balance && data.balance.amount !== undefined) {
+          setBalance(data.balance.amount);
+        }
+        return { success: true, message: data.message };
+      } else {
+        return { success: false, message: data.message || "Failed to add balance" };
+      }
+    } catch (error) {
+      console.error("Failed to add balance:", error);
+      return { success: false, message: "Network error. Please try again." };
+    }
+  };
+
   return (
     <BalanceContext.Provider
-      value={{ balance, addBalance, subtractBalance, setBalance, fetchBalance }}
+      value={{ balance, addBalance, subtractBalance, setBalance, fetchBalance, deductBalance, addBalanceWithBet }}
     >
       {children}
     </BalanceContext.Provider>
