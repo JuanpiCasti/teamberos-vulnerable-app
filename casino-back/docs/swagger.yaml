@@ -217,7 +217,10 @@ paths:
       tags:
         - Balance
       summary: Acreditar balance
-      description: Agrega fondos al balance (usado para premios ganados)
+      description: |
+        ⚠️ VULNERABLE: Agrega fondos al balance sin validación.
+        No verifica bet_id, no comprueba duplicados, no usa transacciones.
+        El frontend puede llamar este endpoint múltiples veces para explotar race conditions.
       security:
         - bearerAuth: []
       requestBody:
@@ -227,17 +230,12 @@ paths:
             schema:
               type: object
               required:
-                - bet_id
                 - amount
               properties:
-                bet_id:
-                  type: integer
-                  description: ID de la apuesta ganadora
-                  example: 123
                 amount:
                   type: number
                   format: double
-                  description: Monto a acreditar
+                  description: Monto a acreditar (sin validación)
                   example: 1000.50
       responses:
         '200':
@@ -256,17 +254,15 @@ paths:
           description: Datos inválidos
         '401':
           description: No autenticado
-        '404':
-          description: Apuesta no encontrada
-        '409':
-          description: Premio ya reclamado
 
   /api/balance/deduct:
     post:
       tags:
         - Balance
       summary: Debitar balance
-      description: Deduce fondos del balance (usado para realizar apuestas)
+      description: |
+        ⚠️ VULNERABLE: Deduce fondos del balance sin validación.
+        No verifica saldo suficiente, permite balances negativos.
       security:
         - bearerAuth: []
       requestBody:
@@ -281,7 +277,7 @@ paths:
                 amount:
                   type: number
                   format: double
-                  description: Monto a debitar
+                  description: Monto a debitar (sin verificar saldo)
                   example: 50.00
       responses:
         '200':
@@ -297,7 +293,7 @@ paths:
                   balance:
                     $ref: '#/components/schemas/Balance'
         '400':
-          description: Datos inválidos o saldo insuficiente
+          description: Datos inválidos
         '401':
           description: No autenticado
 
@@ -305,8 +301,11 @@ paths:
     post:
       tags:
         - Bets
-      summary: Realizar apuesta
-      description: Coloca una apuesta en la ruleta y procesa el resultado inmediatamente
+      summary: Registrar apuesta
+      description: |
+        ⚠️ VULNERABLE: Solo registra la apuesta, no la procesa.
+        No verifica balance, no deduce fondos, no determina ganador, no acredita premios.
+        El frontend controla toda la lógica del juego (insecure trust boundary).
       security:
         - bearerAuth: []
       requestBody:
@@ -317,13 +316,18 @@ paths:
               $ref: '#/components/schemas/BetRequest'
       responses:
         '200':
-          description: Apuesta procesada
+          description: Apuesta registrada (no procesada)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BetResult'
+                type: object
+                properties:
+                  bet_id:
+                    type: integer
+                    description: ID de la apuesta registrada
+                    example: 123
         '400':
-          description: Datos inválidos o saldo insuficiente
+          description: Datos inválidos
         '401':
           description: No autenticado
 

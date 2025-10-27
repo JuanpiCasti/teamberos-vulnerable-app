@@ -186,14 +186,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"bet_id\": 1,\n    \"amount\": 1000\n}"
+							"raw": "{\n    \"amount\": 1000\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/balance/add",
 							"host": ["{{base_url}}"],
 							"path": ["api", "balance", "add"]
 						},
-						"description": "Acredita balance (usado para premios ganados). Requiere ID de apuesta ganadora."
+						"description": "⚠️ VULNERABLE: Acredita balance sin validación. No verifica bet_id ni duplicados. Exploitable mediante race conditions."
 					}
 				},
 				{
@@ -215,7 +215,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["api", "balance", "deduct"]
 						},
-						"description": "Debita balance (usado manualmente, las apuestas lo hacen automáticamente)"
+						"description": "⚠️ VULNERABLE: Debita balance sin verificar saldo. Permite balances negativos."
 					}
 				}
 			]
@@ -233,12 +233,8 @@
 									"if (pm.response.code === 200) {",
 									"    var jsonData = pm.response.json();",
 									"    pm.environment.set(\"last_bet_id\", jsonData.bet_id);",
-									"    console.log(\"Bet placed with ID: \" + jsonData.bet_id);",
-									"    console.log(\"Result: \" + jsonData.result);",
-									"    console.log(\"Winning number: \" + jsonData.winning_number + \" (\" + jsonData.winning_color + \")\");",
-									"    if (jsonData.result === \"win\") {",
-									"        console.log(\"WON! Payout: $\" + jsonData.payout);",
-									"    }",
+									"    console.log(\"Bet registered with ID: \" + jsonData.bet_id);",
+									"    console.log(\"⚠️ Bet only registered, not processed. Frontend determines winner.\");",
 									"}"
 								],
 								"type": "text/javascript"
@@ -262,7 +258,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["api", "bets"]
 						},
-						"description": "Realiza una apuesta a un número específico (pago 36x)"
+						"description": "⚠️ VULNERABLE: Solo registra la apuesta, no la procesa. Frontend controla lógica del juego."
 					}
 				},
 				{
@@ -275,12 +271,8 @@
 									"if (pm.response.code === 200) {",
 									"    var jsonData = pm.response.json();",
 									"    pm.environment.set(\"last_bet_id\", jsonData.bet_id);",
-									"    console.log(\"Bet placed with ID: \" + jsonData.bet_id);",
-									"    console.log(\"Result: \" + jsonData.result);",
-									"    console.log(\"Winning number: \" + jsonData.winning_number + \" (\" + jsonData.winning_color + \")\");",
-									"    if (jsonData.result === \"win\") {",
-									"        console.log(\"WON! Payout: $\" + jsonData.payout);",
-									"    }",
+									"    console.log(\"Bet registered with ID: \" + jsonData.bet_id);",
+									"    console.log(\"⚠️ Bet only registered, not processed. Frontend determines winner.\");",
 									"}"
 								],
 								"type": "text/javascript"
@@ -304,7 +296,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["api", "bets"]
 						},
-						"description": "Realiza una apuesta a un color (red/black/green, pago 2x)"
+						"description": "⚠️ VULNERABLE: Solo registra la apuesta, no la procesa. Frontend controla lógica del juego."
 					}
 				},
 				{
