@@ -94,6 +94,14 @@ export default function Login() {
                 placeholder="Enter your password"
                 disabled={isLoading}
               />
+              <div className="mt-2 text-right">
+                <a
+                  href="/forgot-password"
+                  className="text-sm text-purple-400 hover:text-purple-300 transition"
+                >
+                  Forgot Password?
+                </a>
+              </div>
             </div>
 
             {/* Submit Button */}
