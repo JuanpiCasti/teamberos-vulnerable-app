@@ -51,6 +51,7 @@ func main() {
 
 			// User profile
 			r.Get("/user/profile", handlers.GetProfile)
+			r.Get("/user/profile/{id}", handlers.GetUserProfileByID) // VULNERABLE: IDOR endpoint
 			r.Put("/user/profile", handlers.UpdateProfile)
 
 			// Balance management

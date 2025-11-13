@@ -170,7 +170,15 @@ export default function Roulette() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold">American Roulette</h1>
-            <p className="text-gray-400 mt-1">Playing as {user?.username}</p>
+            <p className="text-gray-400 mt-1">
+              Playing as {user?.username}{" "}
+              <a
+                href={`/user/profile/${user?.id}`}
+                className="text-yellow-500 hover:text-yellow-400 transition text-sm ml-2"
+              >
+                (👤 View Profile)
+              </a>
+            </p>
           </div>
           <div className="flex items-center gap-4">
             <div className="bg-black/50 px-6 py-3 rounded-lg border border-yellow-500">

@@ -156,6 +156,7 @@ See `ruleta/CLAUDE.md` for detailed frontend architecture.
 - `/login` - Login form
 - `/register` - Registration form
 - `/roulette` - Roulette game (requires authentication)
+- `/user/profile/:id` - User profile page (IDOR vulnerable - can view any profile)
 
 **API Integration:**
 - Config in `app/config/api.ts`
@@ -179,8 +180,23 @@ See `ruleta/CLAUDE.md` for detailed frontend architecture.
 This application contains **educational vulnerabilities** forming an attack chain:
 
 ### 1. A01: Broken Access Control (IDOR)
-- **Not Yet Implemented** - Planned for `/user/profile?id=<user_id>`
-- Users should be able to view other users' profiles by changing ID parameter
+- **✅ IMPLEMENTED** - Endpoint: `GET /api/user/profile/:id`
+- Any authenticated user can view ANY other user's profile by changing the ID parameter
+- Frontend route: `/user/profile/:id`
+- No authorization check validates if requesting user has permission to view target profile
+- Exposes username, email, role, balance, and account creation date
+
+**Exploitation:**
+```bash
+# Login as any user, then enumerate profiles:
+curl -H "Authorization: Bearer <token>" http://localhost:8080/api/user/profile/1
+curl -H "Authorization: Bearer <token>" http://localhost:8080/api/user/profile/2
+# Returns full profile including sensitive data for any user
+```
+
+**Frontend Access:**
+- Navigate to `/user/profile/1`, `/user/profile/2`, etc. to view any profile
+- Profile links available from home page and roulette page
 
 ### 2. A02: Cryptographic Failures
 - **Not Yet Implemented** - Planned for password reset tokens

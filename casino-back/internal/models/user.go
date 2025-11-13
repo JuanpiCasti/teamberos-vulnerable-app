@@ -59,3 +59,15 @@ func (u *User) ToResponse() UserResponse {
 		CreatedAt: u.CreatedAt,
 	}
 }
+
+// UserProfileWithBalance represents a user profile including balance information
+// Used for the IDOR-vulnerable endpoint
+type UserProfileWithBalance struct {
+	ID               int        `db:"id" json:"id"`
+	Username         string     `db:"username" json:"username"`
+	Email            string     `db:"email" json:"email"`
+	Role             string     `db:"role" json:"role"`
+	CreatedAt        time.Time  `db:"created_at" json:"created_at"`
+	Balance          float64    `db:"balance" json:"balance"`
+	BalanceUpdatedAt *time.Time `db:"balance_updated_at" json:"balance_updated_at"`
+}

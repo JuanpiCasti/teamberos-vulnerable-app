@@ -49,6 +49,14 @@ export default function Home() {
                   <p className="text-gray-500 text-sm mb-4">{user?.email}</p>
                   <p className="text-gray-400 mb-2">Your Balance</p>
                   <p className="text-5xl font-bold text-yellow-500">${balance}</p>
+                  <div className="mt-4">
+                    <a
+                      href={`/user/profile/${user?.id}`}
+                      className="text-yellow-500 hover:text-yellow-400 transition text-sm"
+                    >
+                      👤 View Profile
+                    </a>
+                  </div>
                 </div>
               </div>
               <div className="text-center">

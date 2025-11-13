@@ -192,6 +192,49 @@ paths:
         '409':
           description: Username o email ya existe
 
+  /api/user/profile/{id}:
+    get:
+      tags:
+        - User Profile
+      summary: Obtener perfil de usuario por ID (VULNERABLE - IDOR)
+      description: |
+        ⚠️ **VULNERABILIDAD INTENCIONAL: IDOR (Insecure Direct Object Reference)**
+
+        Este endpoint permite a cualquier usuario autenticado ver el perfil de CUALQUIER otro usuario
+        simplemente cambiando el parámetro ID. No hay verificación de autorización.
+
+        **Explotación:**
+        - Enumerar IDs de usuarios (1, 2, 3...)
+        - Obtener información sensible: email, balance, rol
+        - Identificar cuentas objetivo para otros ataques
+
+        **Esto es intencional para fines educativos - NO usar en producción.**
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del usuario a consultar
+          example: 5
+      responses:
+        '200':
+          description: Perfil de usuario obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileWithBalance'
+        '400':
+          description: ID de usuario inválido
+        '401':
+          description: No autenticado
+        '404':
+          description: Usuario no encontrado
+        '500':
+          description: Error del servidor
+
   /api/balance:
     get:
       tags:
@@ -410,6 +453,39 @@ components:
           type: string
           format: date-time
           example: 2024-01-15T10:30:00Z
+
+    UserProfileWithBalance:
+      type: object
+      description: Perfil de usuario con balance incluido (usado por endpoint IDOR vulnerable)
+      properties:
+        id:
+          type: integer
+          example: 5
+        username:
+          type: string
+          example: player5
+        email:
+          type: string
+          format: email
+          example: player5@example.com
+        role:
+          type: string
+          enum: [player, admin]
+          example: player
+        created_at:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+        balance:
+          type: number
+          format: double
+          example: 1250.50
+          description: Balance actual del usuario
+        balance_updated_at:
+          type: string
+          format: date-time
+          example: 2024-01-16T14:25:00Z
+          description: Última actualización del balance
 
     Balance:
       type: object
