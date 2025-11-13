@@ -72,10 +72,10 @@ func CreateBet(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetBets returns the authenticated user's bet history
-// TODO: This endpoint will be made vulnerable to SQL Injection
-// by accepting a filter parameter without proper sanitization:
+// VULNERABLE: SQL Injection via filter parameter
 // Example: /api/bets?filter=2024-01-01
-// The query will be built using string concatenation instead of parameterized queries
+// The filter parameter is concatenated directly into the SQL query without sanitization
+// Attackers can inject SQL to read data from other tables or other users' records
 func GetBets(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user ID from context
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
@@ -84,9 +84,23 @@ func GetBets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch bets (currently secure with parameterized query)
+	// Get filter parameter from query string
+	filter := r.URL.Query().Get("filter")
+
 	var bets []models.Bet
-	err := database.DB.Select(&bets, `SELECT * FROM bets WHERE user_id = ? ORDER BY created_at DESC`, userID)
+	var err error
+
+	if filter != "" {
+		// VULNERABLE: Building SQL query with string concatenation
+		// This allows SQL injection attacks
+		// Example exploit: /api/bets?filter=2024-01-01' UNION SELECT id,user_id,username AS bet_type,email AS bet_value,0.0,NULL,NULL,'',0.0,created_at FROM users--
+		query := "SELECT * FROM bets WHERE user_id = " + strconv.Itoa(userID) + " AND DATE(created_at) = '" + filter + "' ORDER BY created_at DESC"
+		err = database.DB.Select(&bets, query)
+	} else {
+		// No filter provided, use secure parameterized query
+		err = database.DB.Select(&bets, `SELECT * FROM bets WHERE user_id = ? ORDER BY created_at DESC`, userID)
+	}
+
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
@@ -129,4 +143,52 @@ func GetBetByID(w http.ResponseWriter, r *http.Request) {
 	// Return bet
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(bet)
+}
+
+// UpdateBetResult updates a bet with the final result and payout
+// VULNERABLE: Frontend controls the result - no server-side validation
+func UpdateBetResult(w http.ResponseWriter, r *http.Request) {
+	// Get authenticated user ID from context
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Get bet ID from URL parameter
+	betIDStr := chi.URLParam(r, "id")
+	betID, err := strconv.Atoi(betIDStr)
+	if err != nil {
+		http.Error(w, "Invalid bet ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse request
+	var req struct {
+		WinningNumber string  `json:"winning_number"`
+		WinningColor  string  `json:"winning_color"`
+		Result        string  `json:"result"`
+		Payout        float64 `json:"payout"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// VULNERABLE: No validation that the bet belongs to this user
+	// No validation of the result or payout amount
+	// Frontend completely controls win/loss determination
+	_, err = database.DB.Exec(
+		`UPDATE bets SET winning_number = ?, winning_color = ?, result = ?, payout = ? WHERE id = ? AND user_id = ?`,
+		req.WinningNumber, req.WinningColor, req.Result, req.Payout, betID, userID,
+	)
+	if err != nil {
+		http.Error(w, "Failed to update bet", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Bet updated successfully",
+	})
 }

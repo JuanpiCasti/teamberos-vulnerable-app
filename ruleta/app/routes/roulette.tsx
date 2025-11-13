@@ -121,6 +121,7 @@ export default function Roulette() {
         // Step 4: Calculate winnings based on FRONTEND determination
         let totalWinnings = 0;
         const winningBets: string[] = [];
+        let result = "loss";
 
         bets.forEach((bet) => {
           if (bet.type === "number" && bet.value === winner.number) {
@@ -128,15 +129,32 @@ export default function Roulette() {
             const payout = bet.amount * 36;
             totalWinnings += payout;
             winningBets.push(`${bet.value} (number)`);
+            result = "win";
           } else if (bet.type === "color" && bet.value === winner.color) {
             // Color bet: 1:1 payout + original bet = 2x
             const payout = bet.amount * 2;
             totalWinnings += payout;
             winningBets.push(`${bet.value} (color)`);
+            result = "win";
           }
         });
 
-        // Step 5: If frontend determines win, credit via backend
+        // Step 5: Update bet record with result
+        try {
+          await authenticatedFetch(`/api/bets/${betId}`, {
+            method: "PUT",
+            body: JSON.stringify({
+              winning_number: winner.number,
+              winning_color: winner.color,
+              result: result,
+              payout: totalWinnings,
+            }),
+          });
+        } catch (error) {
+          console.error("Failed to update bet record:", error);
+        }
+
+        // Step 6: If frontend determines win, credit via backend
         // VULNERABLE: Frontend decides if user won and amount
         if (totalWinnings > 0) {
           const addResult = await addBalanceWithBet(betId, totalWinnings);
@@ -219,13 +237,12 @@ export default function Roulette() {
               </div>
 
               {message && (
-                <div className={`p-4 rounded-lg text-center font-semibold ${
-                  message.includes("Winner") || message.includes("won")
+                <div className={`p-4 rounded-lg text-center font-semibold ${message.includes("Winner") || message.includes("won")
                     ? "bg-green-600/80"
                     : message.includes("Insufficient") || message.includes("Place a bet")
-                    ? "bg-red-600/80"
-                    : "bg-blue-600/80"
-                }`}>
+                      ? "bg-red-600/80"
+                      : "bg-blue-600/80"
+                  }`}>
                   {message}
                 </div>
               )}
