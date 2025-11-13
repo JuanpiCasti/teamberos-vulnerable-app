@@ -71,3 +71,23 @@ type UserProfileWithBalance struct {
 	Balance          float64    `db:"balance" json:"balance"`
 	BalanceUpdatedAt *time.Time `db:"balance_updated_at" json:"balance_updated_at"`
 }
+
+// ForgotPasswordRequest represents the request to initiate password reset
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+// ResetPasswordRequest represents the request to reset password with token
+type ResetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
+// PasswordResetToken represents a password reset token in the database
+type PasswordResetToken struct {
+	ID        int       `db:"id" json:"id"`
+	UserID    int       `db:"user_id" json:"user_id"`
+	Token     string    `db:"token" json:"token"`
+	Email     string    `db:"email" json:"email"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+}

@@ -45,6 +45,11 @@ func main() {
 		r.Post("/register", handlers.Register)
 		r.Post("/login", handlers.Login)
 
+		// Password reset endpoints (VULNERABLE: A02 - MD5 tokens)
+		r.Post("/auth/forgot-password", handlers.ForgotPassword)
+		r.Get("/auth/reset-password/{token}", handlers.VerifyResetToken)
+		r.Post("/auth/reset-password", handlers.ResetPassword)
+
 		// Protected routes (authentication required)
 		r.Group(func(r chi.Router) {
 			r.Use(custommw.AuthMiddleware)
