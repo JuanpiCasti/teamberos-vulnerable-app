@@ -68,6 +68,7 @@ func main() {
 			r.Post("/bets", handlers.CreateBet)
 			r.Get("/bets", handlers.GetBets)
 			r.Get("/bets/{id}", handlers.GetBetByID)
+			r.Put("/bets/{id}", handlers.UpdateBetResult)
 		})
 	})
 
