@@ -3,12 +3,24 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"runtime"
+	"sync/atomic"
+	"time"
 
 	"github.com/juanpicasti/casino-back/internal/database"
 	"github.com/juanpicasti/casino-back/internal/middleware"
 	"github.com/juanpicasti/casino-back/internal/models"
 )
+
+// VULNERABLE: In-memory map to track used game tokens WITHOUT synchronization
+// This map is NOT protected by a mutex, making it vulnerable to race conditions
+// Multiple goroutines can read/write simultaneously, causing the check-then-set pattern to fail
+var usedGameTokens = make(map[string]bool)
+
+// Counter to track concurrent requests (for debugging/demonstration)
+var activeRequests int64
 
 // GetBalance returns the authenticated user's balance
 func GetBalance(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +54,14 @@ func GetBalance(w http.ResponseWriter, r *http.Request) {
 // This allows concurrent requests to pass the check simultaneously before any insert happens
 // EXPLOIT: Send multiple concurrent POST requests with the same game_token using Burp Intruder
 func AddBalance(w http.ResponseWriter, r *http.Request) {
+	// Track concurrent requests for debugging
+	active := atomic.AddInt64(&activeRequests, 1)
+	defer atomic.AddInt64(&activeRequests, -1)
+
+	// Log concurrency for educational demonstration
+	numGoroutines := runtime.NumGoroutine()
+	fmt.Printf("🔥 AddBalance: %d concurrent requests | %d total goroutines\n", active, numGoroutines)
+
 	// Get authenticated user ID from context
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
@@ -62,33 +82,33 @@ func AddBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// VULNERABLE: Check if game_token has been credited WITHOUT locking
-	// This is the race condition window! Multiple concurrent requests can all pass this check
-	// before any of them insert into game_token_credits
-	var existingCredit models.GameTokenCredit
-	err := database.DB.Get(&existingCredit, 
-		`SELECT * FROM game_token_credits WHERE game_token = ?`, 
-		req.GameToken,
-	)
-	
-	// If we found an existing credit, reject (but race condition allows bypass)
-	if err == nil {
+	// VULNERABLE: Check-then-set pattern with in-memory map WITHOUT mutex protection
+	// This is a CLASSIC race condition vulnerability!
+	// Multiple goroutines can all read usedGameTokens[token] simultaneously,
+	// all see false, then all proceed to set it to true and credit the balance
+
+	// RACE CONDITION WINDOW STARTS HERE
+	if usedGameTokens[req.GameToken] {
+		// Token already used - reject
 		http.Error(w, "This game token has already been credited", http.StatusBadRequest)
 		return
 	}
-	
-	// Only proceed if NOT found (sql.ErrNoRows is expected for new tokens)
-	if err != sql.ErrNoRows {
-		http.Error(w, "Database error checking game token", http.StatusInternalServerError)
-		return
-	}
 
-	// RACE CONDITION WINDOW: Between the check above and the inserts below
-	// Multiple concurrent requests can all reach here if sent at the same time
-	// They all passed the check because none had inserted yet
+	// RACE CONDITION WINDOW: Between the check above and the set below
+	// Multiple concurrent requests can ALL pass the check before ANY of them sets the flag
+	// All will see usedGameTokens[token] == false, then all will proceed
+
+	// ARTIFICIAL DELAY to widen the race condition window (educational demonstration)
+	// This simulates slow processing, network latency, or complex business logic
+	// In production, this delay would be natural from API calls, DB queries, etc.
+	time.Sleep(50 * time.Millisecond)  // 50ms delay makes race condition VERY exploitable
+
+	// Mark token as used (but it's too late - race already happened!)
+	usedGameTokens[req.GameToken] = true
+	// RACE CONDITION WINDOW ENDS HERE
 
 	// Add balance (no transaction, no lock!)
-	_, err = database.DB.Exec(
+	_, err := database.DB.Exec(
 		`UPDATE balances SET amount = amount + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?`,
 		req.Amount, userID,
 	)
@@ -97,17 +117,12 @@ func AddBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Record that this game_token has been credited (but it's too late, race already happened)
-	_, err = database.DB.Exec(
+	// Optional: Record in database for audit trail (ignore errors)
+	// This is NOT used for validation - only the in-memory map is checked
+	database.DB.Exec(
 		`INSERT INTO game_token_credits (game_token, user_id, bet_id, amount) VALUES (?, ?, ?, ?)`,
 		req.GameToken, userID, req.BetID, req.Amount,
 	)
-	if err != nil {
-		// Even if this fails due to unique constraint, the balance was already added!
-		// This is another vulnerability - no rollback
-		http.Error(w, "Failed to record credit", http.StatusInternalServerError)
-		return
-	}
 
 	// Fetch updated balance
 	var balance models.Balance

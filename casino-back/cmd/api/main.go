@@ -32,7 +32,7 @@ func main() {
 
 	// CORS configuration
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:5174", "http://localhost:5175"},
+		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -78,14 +78,26 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Start server
+	// Start server with explicit configuration for maximum concurrency
 	port := getEnv("PORT", "8080")
+
+	// Configure HTTP server for high concurrency (educational: makes race conditions easier to exploit)
+	server := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
+		// No ReadTimeout/WriteTimeout to allow long-running concurrent requests
+		// This makes race condition exploitation easier
+		MaxHeaderBytes: 1 << 20, // 1 MB
+	}
+
 	log.Printf("Server starting on port %s...", port)
+	log.Printf("Server configured for MAXIMUM CONCURRENCY (no request throttling)")
 	log.Printf("CORS enabled for: http://localhost:5173, http://localhost:5174, http://localhost:5175")
 	log.Printf("⚠️  WARNING: This is an educational project with intentional vulnerabilities")
 	log.Printf("    DO NOT use in production or expose to the internet!")
+	log.Printf("    Race conditions are INTENTIONALLY exploitable")
 
-	if err := http.ListenAndServe(":"+port, r); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }

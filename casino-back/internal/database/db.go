@@ -17,16 +17,31 @@ func InitDB(dbPath string) error {
 		return err
 	}
 
+	// VULNERABLE: Configure SQLite for maximum concurrency to make race conditions EASIER
+	// WAL mode allows multiple readers and concurrent writes
+	// This makes the race condition window more exploitable
+	_, err = DB.Exec("PRAGMA journal_mode=WAL")
+	if err != nil {
+		log.Printf("Warning: Could not enable WAL mode: %v", err)
+	}
+
+	// Reduce synchronous level for speed (makes race conditions more likely)
+	_, err = DB.Exec("PRAGMA synchronous=NORMAL")
+	if err != nil {
+		log.Printf("Warning: Could not set synchronous mode: %v", err)
+	}
+
 	// Set connection pool settings
-	DB.SetMaxOpenConns(25)
-	DB.SetMaxIdleConns(5)
+	// High connection count allows more concurrent requests
+	DB.SetMaxOpenConns(100)  // Increased from 25
+	DB.SetMaxIdleConns(25)   // Increased from 5
 
 	// Create tables
 	if err := createTables(); err != nil {
 		return err
 	}
 
-	log.Println("Database initialized successfully")
+	log.Println("Database initialized successfully (WAL mode enabled for race conditions)")
 	return nil
 }
 

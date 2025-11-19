@@ -4,7 +4,8 @@
       "Bash(dir:*)",
       "mcp__ide__getDiagnostics",
       "Bash(mkdir:*)",
-      "Bash(npm run typecheck:*)"
+      "Bash(npm run typecheck:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

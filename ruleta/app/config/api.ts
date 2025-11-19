@@ -1,5 +1,5 @@
 // API Configuration for Casino Backend
-export const API_BASE_URL = "http://localhost:8080";
+export const API_BASE_URL = "https://delegable-florencio-dialytically.ngrok-free.dev";
 
 /**
  * Helper function for authenticated API requests
