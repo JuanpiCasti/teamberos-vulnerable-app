@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -29,8 +31,19 @@ var rouletteWheel = []struct {
 	{"14", "red"}, {"2", "black"},
 }
 
+// generateGameToken generates a unique token for each game round
+// This token will be used to prevent duplicate credit requests (or exploit race conditions)
+func generateGameToken() (string, error) {
+	bytes := make([]byte, 32) // 256 bits
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
 // CreateBet handles placing a new bet (SIMPLIFIED - just records, doesn't process)
 // VULNERABLE: No balance check, no processing, frontend controls everything
+// A04: Generates a game_token that will be used for race condition vulnerability
 func CreateBet(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user ID from context
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
@@ -46,12 +59,19 @@ func CreateBet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate unique game token for this round (for A04 vulnerability)
+	gameToken, err := generateGameToken()
+	if err != nil {
+		http.Error(w, "Failed to generate game token", http.StatusInternalServerError)
+		return
+	}
+
 	// VULNERABLE: Just record the bet, no validation, no processing
 	// No balance check, no deduction, no spinning, no crediting
 	// Frontend handles all game logic
 	res, err := database.DB.Exec(
-		`INSERT INTO bets (user_id, bet_type, bet_value, bet_amount, result, payout) VALUES (?, ?, ?, ?, 'pending', 0.0)`,
-		userID, req.BetType, req.BetValue, req.BetAmount,
+		`INSERT INTO bets (user_id, bet_type, bet_value, bet_amount, game_token, result, payout) VALUES (?, ?, ?, ?, ?, 'pending', 0.0)`,
+		userID, req.BetType, req.BetValue, req.BetAmount, gameToken,
 	)
 	if err != nil {
 		http.Error(w, "Failed to record bet", http.StatusInternalServerError)
@@ -64,10 +84,11 @@ func CreateBet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Just return bet_id, nothing else
+	// Return bet_id and game_token (token needed for crediting winnings)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"bet_id": int(betID),
+		"bet_id":     int(betID),
+		"game_token": gameToken,
 	})
 }
 

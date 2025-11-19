@@ -25,6 +25,7 @@ export default function Roulette() {
   const [winningIndex, setWinningIndex] = useState<number | null>(null);
   const [message, setMessage] = useState<string>("");
   const [lastBetId, setLastBetId] = useState<number | null>(null);
+  const [gameToken, setGameToken] = useState<string | null>(null);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -107,7 +108,9 @@ export default function Roulette() {
 
       const betData = await betResponse.json();
       const betId = betData.bet_id;
+      const token = betData.game_token; // A04: Game token for race condition vulnerability
       setLastBetId(betId);
+      setGameToken(token);
 
       setMessage("Spinning...");
 
@@ -156,8 +159,11 @@ export default function Roulette() {
 
         // Step 6: If frontend determines win, credit via backend
         // VULNERABLE: Frontend decides if user won and amount
-        if (totalWinnings > 0) {
-          const addResult = await addBalanceWithBet(betId, totalWinnings);
+        // A04 VULNERABILITY: game_token used but checked WITHOUT locks in backend
+        // EXPLOIT: Capture this request in Burp, send to Intruder, send 10+ concurrent requests
+        //          All requests will pass the token check and credit multiple times!
+        if (totalWinnings > 0 && token) {
+          const addResult = await addBalanceWithBet(betId, token, totalWinnings);
           if (addResult.success) {
             setMessage(
               `Winner! ${winner.number} ${winner.color}! You won $${totalWinnings}! (${winningBets.join(", ")})`

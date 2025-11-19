@@ -8,6 +8,7 @@ type Bet struct {
 	BetType        string    `db:"bet_type" json:"bet_type"`       // "number" or "color"
 	BetValue       string    `db:"bet_value" json:"bet_value"`     // The number or color bet on
 	BetAmount      float64   `db:"bet_amount" json:"bet_amount"`   // Amount wagered
+	GameToken      string    `db:"game_token" json:"game_token"`   // Unique token for this game round (for race condition)
 	WinningNumber  *string   `db:"winning_number" json:"winning_number,omitempty"` // Actual result
 	WinningColor   *string   `db:"winning_color" json:"winning_color,omitempty"`
 	Result         string    `db:"result" json:"result"`           // "win" or "loss"

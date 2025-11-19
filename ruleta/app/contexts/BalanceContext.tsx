@@ -9,7 +9,7 @@ interface BalanceContextType {
   setBalance: (amount: number) => void;
   fetchBalance: () => Promise<void>;
   deductBalance: (amount: number) => Promise<{ success: boolean; message?: string }>;
-  addBalanceWithBet: (betId: number, amount: number) => Promise<{ success: boolean; message?: string }>;
+  addBalanceWithBet: (betId: number, gameToken: string, amount: number) => Promise<{ success: boolean; message?: string }>;
 }
 
 const BalanceContext = createContext<BalanceContextType | undefined>(undefined);
@@ -65,11 +65,19 @@ export function BalanceProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addBalanceWithBet = async (betId: number, amount: number): Promise<{ success: boolean; message?: string }> => {
+  // A04 VULNERABILITY: Race Condition on Balance Credit
+  // This function now requires bet_id and game_token
+  // The backend checks if game_token was already credited, BUT without proper locking
+  // EXPLOIT: Send multiple concurrent requests with the same game_token using Burp Intruder
+  const addBalanceWithBet = async (betId: number, gameToken: string, amount: number): Promise<{ success: boolean; message?: string }> => {
     try {
       const response = await authenticatedFetch("/api/balance/add", {
         method: "POST",
-        body: JSON.stringify({ amount }), // Backend no longer requires bet_id
+        body: JSON.stringify({ 
+          bet_id: betId,
+          game_token: gameToken,  // Required for race condition vulnerability
+          amount 
+        }),
       });
 
       const data = await response.json();

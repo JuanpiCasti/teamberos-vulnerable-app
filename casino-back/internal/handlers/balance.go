@@ -37,9 +37,10 @@ func GetBalance(w http.ResponseWriter, r *http.Request) {
 }
 
 // AddBalance adds funds to the user's balance (for winning bets)
-// VULNERABLE: No validation, no transaction locking, fully exploitable race condition
-// Frontend can call this multiple times with same bet_id
-// Frontend determines winning amounts (insecure trust boundary)
+// A04: VULNERABLE TO RACE CONDITION
+// The function checks if a game_token has been credited, but WITHOUT proper locking
+// This allows concurrent requests to pass the check simultaneously before any insert happens
+// EXPLOIT: Send multiple concurrent POST requests with the same game_token using Burp Intruder
 func AddBalance(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user ID from context
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
@@ -48,23 +49,63 @@ func AddBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse request - accept amount without validation
-	var req struct {
-		Amount float64 `json:"amount"`
-	}
+	// Parse request - now requires game_token and bet_id
+	var req models.BalanceAddRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// VULNERABLE: No checks, just add balance directly
-	// No transaction, no bet validation, no duplicate check
-	_, err := database.DB.Exec(
+	// Validate that required fields are present
+	if req.GameToken == "" || req.BetID == 0 {
+		http.Error(w, "game_token and bet_id are required", http.StatusBadRequest)
+		return
+	}
+
+	// VULNERABLE: Check if game_token has been credited WITHOUT locking
+	// This is the race condition window! Multiple concurrent requests can all pass this check
+	// before any of them insert into game_token_credits
+	var existingCredit models.GameTokenCredit
+	err := database.DB.Get(&existingCredit, 
+		`SELECT * FROM game_token_credits WHERE game_token = ?`, 
+		req.GameToken,
+	)
+	
+	// If we found an existing credit, reject (but race condition allows bypass)
+	if err == nil {
+		http.Error(w, "This game token has already been credited", http.StatusBadRequest)
+		return
+	}
+	
+	// Only proceed if NOT found (sql.ErrNoRows is expected for new tokens)
+	if err != sql.ErrNoRows {
+		http.Error(w, "Database error checking game token", http.StatusInternalServerError)
+		return
+	}
+
+	// RACE CONDITION WINDOW: Between the check above and the inserts below
+	// Multiple concurrent requests can all reach here if sent at the same time
+	// They all passed the check because none had inserted yet
+
+	// Add balance (no transaction, no lock!)
+	_, err = database.DB.Exec(
 		`UPDATE balances SET amount = amount + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?`,
 		req.Amount, userID,
 	)
 	if err != nil {
 		http.Error(w, "Failed to update balance", http.StatusInternalServerError)
+		return
+	}
+
+	// Record that this game_token has been credited (but it's too late, race already happened)
+	_, err = database.DB.Exec(
+		`INSERT INTO game_token_credits (game_token, user_id, bet_id, amount) VALUES (?, ?, ?, ?)`,
+		req.GameToken, userID, req.BetID, req.Amount,
+	)
+	if err != nil {
+		// Even if this fails due to unique constraint, the balance was already added!
+		// This is another vulnerability - no rollback
+		http.Error(w, "Failed to record credit", http.StatusInternalServerError)
 		return
 	}
 
